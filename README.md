@@ -19,6 +19,65 @@ There is a `bin/deploy` script that builds the binary file and performs actions 
 
 If deploying for the first time, you will have to set up the server (see Raspberry Pi Zero Setup section) and create `heating_config.json` (see `heating_config.json.sample`).
 
+### Accessing API endpoings
+
+You can access all data by hitting the API endpoints with cURL.
+The host name depends on your server configuration. Also, keep
+in mind that the scheduler needs to populate some data before
+you will see any results (prior to that, it will return HTTP 404).
+
+```
+neuroheat λ curl heating-brain.local:3030/api/temperatures/office | jq
+{
+  "timestamp": "2024-10-06 10:32:03",
+  "temperature": "21.937",
+  "key": "office",
+  "label": "Office",
+  "expected_temperature": "21"
+}
+```
+
+```
+neuroheat λ curl neurobrain.local:3030/api/temperatures | jq
+{
+  "office": {
+    "temperature": "21.937",
+    "label": "Office",
+    "timestamp": "2024-10-06 10:30:03",
+    "expected_temperature": "21"
+  },
+  "living_room": {
+    "label": "Living Room",
+    "temperature": "22",
+    "timestamp": "2024-10-06 10:30:02",
+    "expected_temperature": "21"
+  },
+  "bedroom": {
+    "timestamp": "2024-10-06 10:30:04",
+    "expected_temperature": "18.5",
+    "temperature": "19.687",
+    "label": "Bedroom"
+  },
+  "guest_room": {
+    "temperature": "19.312",
+    "timestamp": "2024-10-06 10:30:05",
+    "expected_temperature": "18.5",
+    "label": "Guest Room"
+  },
+  "bathroom": {
+    "temperature": "21.5",
+    "expected_temperature": "21",
+    "label": "Bathroom",
+    "timestamp": "2024-10-06 10:30:01"
+  },
+  "pipe": {
+    "temperature": "37.25",
+    "timestamp": "2024-10-06 10:30:01",
+    "label": "Heating Pipe"
+  }
+}
+```
+
 ### Accessing the database console
 
 Install `sudo apt install -y sqlite` and run:
