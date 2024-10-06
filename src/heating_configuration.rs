@@ -1,6 +1,8 @@
+use crate::error::NeuroheatError;
 use crate::temperature_sensor::{TemperatureSensor, DS18B20};
+
+use chrono::{Local, Timelike};
 use serde::Deserialize;
-use std::error::Error;
 use std::fs::File;
 use std::io::BufReader;
 use std::sync::Arc;
@@ -52,10 +54,18 @@ pub struct HeatingConfiguration {
 
 impl HeatingConfiguration {
     /// Reads the heating configuration from a JSON file.
-    pub fn from_file(path: &str) -> Result<Self, Box<dyn Error + Send + Sync>> {
-        let file = File::open(path)?;
+    pub fn from_file(path: &str) -> Result<Self, NeuroheatError> {
+        let file = File::open(path).map_err(|e| {
+            let err_msg = format!("Failed to open configuration file {}: {}", path, e);
+            log::error!("{}", err_msg);
+            NeuroheatError::ConfigurationError(err_msg)
+        })?;
         let reader = BufReader::new(file);
-        let mut config: HeatingConfiguration = serde_json::from_reader(reader)?;
+        let mut config: HeatingConfiguration = serde_json::from_reader(reader).map_err(|e| {
+            let err_msg = format!("Failed to parse configuration file {}: {}", path, e);
+            log::error!("{}", err_msg);
+            NeuroheatError::ConfigurationError(err_msg)
+        })?;
 
         // Initialize sensors
         for room in &mut config.rooms {
@@ -64,5 +74,18 @@ impl HeatingConfiguration {
         config.pipe_sensor = Some(Arc::new(DS18B20::new(config.pipe_sensor_id.clone())));
 
         Ok(config)
+    }
+}
+
+impl Room {
+    pub fn get_expected_temperature(&self) -> Option<f32> {
+        let current_hour = Local::now().hour() as u8;
+
+        self.temperature_schedule
+            .iter()
+            .find(|schedule| {
+                current_hour >= schedule.start_hour && current_hour < schedule.end_hour
+            })
+            .map(|schedule| schedule.temperature)
     }
 }

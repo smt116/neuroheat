@@ -89,6 +89,12 @@ rg/documentation/installation/installing-images/README.md) for details.
     sudo apt-get autoclean
     ```
 
+1. Set local timezone:
+
+    ```
+    sudo timedatectl set-timezone Europe/Warsaw
+    ```
+
 1. Configure [rsyslog](https://www.rsyslog.com/doc/master/tutorials/reliable_forwarding.html) (optional):
 
     ```

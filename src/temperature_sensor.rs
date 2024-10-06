@@ -1,10 +1,10 @@
 use rusqlite::Connection;
-use std::error::Error;
 use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
+use crate::error::NeuroheatError;
 use crate::heating_configuration::HeatingConfiguration;
 use crate::repo;
 
@@ -34,49 +34,55 @@ impl std::fmt::Debug for DS18B20 {
 }
 
 pub trait TemperatureSensor: std::fmt::Debug + Send + Sync {
-    fn read(&self) -> Result<f32, Box<dyn Error + Send + Sync>>;
+    fn read(&self) -> Result<f32, NeuroheatError>;
 }
 
 impl TemperatureSensor for DS18B20 {
-    fn read(&self) -> Result<f32, Box<dyn Error + Send + Sync>> {
+    fn read(&self) -> Result<f32, NeuroheatError> {
         let path = Path::new(&self.file_path);
 
         let file = File::open(&path)?;
         let reader = io::BufReader::new(file);
 
         let mut lines = reader.lines();
-        let first_line = lines
-            .next()
-            .ok_or(io::Error::new(io::ErrorKind::Other, "No first line"))??;
+        let first_line = lines.next().ok_or_else(|| {
+            let err_msg = "No first line".to_string();
+            log::error!("{}", err_msg);
+            NeuroheatError::SensorError(err_msg)
+        })??;
 
         if !first_line.ends_with("YES") {
-            return Err(Box::new(io::Error::new(
-                io::ErrorKind::Other,
-                "CRC check failed",
-            )));
+            let err_msg = "CRC check failed".to_string();
+            log::error!("{}", err_msg);
+            return Err(NeuroheatError::SensorError(err_msg));
         }
 
-        let second_line = lines
-            .next()
-            .ok_or(io::Error::new(io::ErrorKind::Other, "No second line"))??;
+        let second_line = lines.next().ok_or_else(|| {
+            let err_msg = "No second line".to_string();
+            log::error!("{}", err_msg);
+            NeuroheatError::SensorError(err_msg)
+        })??;
 
         if let Some(pos) = second_line.find("t=") {
             let temp_str = &second_line[pos + 2..];
-            let temp_millidegrees: i32 = temp_str
-                .parse()
-                .map_err(|_| io::Error::new(io::ErrorKind::Other, "Failed to parse temperature"))?;
+            let temp_millidegrees: i32 = temp_str.parse().map_err(|_| {
+                let err_msg = "Failed to parse temperature".to_string();
+                log::error!("{}", err_msg);
+                NeuroheatError::SensorError(err_msg)
+            })?;
             let temperature = temp_millidegrees as f32 / 1000.0;
 
             if temperature < 0.0 || temperature > 50.0 {
-                Err(format!("Temperature out of range: {:.1}°C", temperature).into())
+                let err_msg = format!("Temperature out of range: {:.1}°C", temperature);
+                log::error!("{}", err_msg);
+                Err(NeuroheatError::SensorError(err_msg))
             } else {
                 Ok(temperature)
             }
         } else {
-            Err(Box::new(io::Error::new(
-                io::ErrorKind::Other,
-                "Temperature data not found",
-            )))
+            let err_msg = "Temperature data not found".to_string();
+            log::error!("{}", err_msg);
+            Err(NeuroheatError::SensorError(err_msg))
         }
     }
 }
@@ -84,12 +90,14 @@ impl TemperatureSensor for DS18B20 {
 pub async fn read_temperatures(
     config: Arc<HeatingConfiguration>,
     conn: Arc<Mutex<Connection>>,
-) -> Result<(), Box<dyn Error + Send + Sync>> {
+) -> Result<(), NeuroheatError> {
     if let Some(pipe_sensor) = &config.pipe_sensor {
         match pipe_sensor.read() {
             Ok(temp) => {
                 log::info!("Pipe Temperature: {:.1}°C", temp);
-                repo::store_temperature(&conn, "pipe", temp)?;
+                if let Err(e) = repo::store_temperature(&conn, "pipe", temp, None) {
+                    log::error!("Failed to store pipe temperature: {}", e);
+                }
             }
             Err(e) => {
                 log::warn!("Error reading pipe temperature: {}", e);
@@ -101,13 +109,30 @@ pub async fn read_temperatures(
         if let Some(sensor) = &room.sensor {
             match sensor.read() {
                 Ok(temp) => {
-                    log::info!("Room: {}, Temperature: {:.1}°C", room.name, temp);
-                    repo::store_temperature(&conn, &room.key, temp)?;
+                    let expected_temp = room.get_expected_temperature();
+                    match expected_temp {
+                        Some(expected) => {
+                            log::info!(
+                                "Room: {}, Temperature: {:.1}°C, Expected Temperature: {:.1}°C",
+                                room.name,
+                                temp,
+                                expected
+                            );
+                        }
+                        None => {
+                            log::info!("Room: {}, Temperature: {:.1}°C", room.name, temp);
+                        }
+                    }
+                    if let Err(e) = repo::store_temperature(&conn, &room.key, temp, expected_temp) {
+                        log::error!("Failed to store temperature for room {}: {}", room.name, e);
+                    }
                 }
                 Err(e) => {
                     log::warn!("Error reading temperature for {}: {}", room.name, e);
                 }
             }
+        } else {
+            log::warn!("No sensor found for room: {}", room.name);
         }
     }
 

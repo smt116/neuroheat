@@ -31,7 +31,10 @@ async fn get_all_temperatures(
 ) -> Result<impl warp::Reply, warp::Rejection> {
     match repo::get_latest_temperatures(&conn) {
         Ok(result) => Ok(warp::reply::json(&result)),
-        Err(_) => Err(warp::reject::not_found()),
+        Err(e) => {
+            log::error!("Failed to get all temperatures: {}", e);
+            Err(warp::reject::not_found())
+        }
     }
 }
 
@@ -41,7 +44,10 @@ async fn get_temperature_by_room(
 ) -> Result<impl warp::Reply, warp::Rejection> {
     match repo::get_latest_temperature(&conn, &room) {
         Ok(result) => Ok(warp::reply::json(&result)),
-        Err(_) => Err(warp::reject::not_found()),
+        Err(e) => {
+            log::error!("Failed to get temperature for room {}: {}", room, e);
+            Err(warp::reject::not_found())
+        }
     }
 }
 

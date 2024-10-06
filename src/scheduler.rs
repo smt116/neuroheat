@@ -12,7 +12,7 @@ pub async fn start_scheduler(
 ) -> Result<JobScheduler, Box<dyn Error + Send + Sync>> {
     let scheduler = JobScheduler::new().await?;
 
-    let job = Job::new_async("0 */5 * * * *", move |_uuid, _l| {
+    let job = Job::new_async("0 * * * * *", move |_uuid, _l| {
         let config_clone = Arc::clone(&config);
         let conn_clone = Arc::clone(&conn);
 

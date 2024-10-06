@@ -1,14 +1,18 @@
-use rusqlite::{params, Connection, Result as SqliteResult};
+use rusqlite::{params, Connection};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use crate::db;
+use crate::error::NeuroheatError;
 use crate::heating_configuration::HeatingConfiguration;
 
-pub fn init(conn: &Arc<Mutex<Connection>>, config: &HeatingConfiguration) -> SqliteResult<()> {
+pub fn init(
+    conn: &Arc<Mutex<Connection>>,
+    config: &HeatingConfiguration,
+) -> Result<(), NeuroheatError> {
     db::with_locked_connection(conn, |conn| {
         conn.execute(
-            "CREATE TABLE IF NOT EXISTS rooms (
+            "CREATE TABLE IF NOT EXISTS labels (
               key TEXT PRIMARY KEY,
               label TEXT NOT NULL
           )",
@@ -20,8 +24,9 @@ pub fn init(conn: &Arc<Mutex<Connection>>, config: &HeatingConfiguration) -> Sql
               id INTEGER PRIMARY KEY,
               room_key TEXT NOT NULL,
               temperature REAL NOT NULL,
+              expected_temperature REAL,
               timestamp TEXT NOT NULL DEFAULT (datetime('now', 'utc')),
-              FOREIGN KEY(room_key) REFERENCES rooms(key)
+              FOREIGN KEY(room_key) REFERENCES labels(key)
           )",
             [],
         )?;
@@ -33,66 +38,84 @@ pub fn init(conn: &Arc<Mutex<Connection>>, config: &HeatingConfiguration) -> Sql
 
         for room in &config.rooms {
             conn.execute(
-                "INSERT OR IGNORE INTO rooms (key, label) VALUES (?1, ?2)",
+                "INSERT OR IGNORE INTO labels (key, label) VALUES (?1, ?2)",
                 params![room.key, room.name],
             )?;
         }
 
+        // Insert a value for the pipe as "Heating Pipe"
+        conn.execute(
+            "INSERT OR IGNORE INTO labels (key, label) VALUES (?1, ?2)",
+            params!["pipe", "Heating Pipe"],
+        )?;
+
         Ok(())
-    }).map_err(|e| {
-        eprintln!("Failed to initialize database: {}", e);
-        std::process::abort();
+    })
+    .map_err(|e| {
+        let err_msg = format!("Failed to initialize database: {}", e);
+        log::error!("{}", err_msg);
+        NeuroheatError::DatabaseError(err_msg)
     })
 }
 
 pub fn get_latest_temperature(
     conn: &Arc<Mutex<Connection>>,
     room_key: &str,
-) -> SqliteResult<HashMap<&'static str, String>> {
+) -> Result<HashMap<&'static str, String>, NeuroheatError> {
     db::with_locked_connection(conn, |conn| {
         conn.query_row(
             "SELECT
-               temperatures.room_key AS key,
-               COALESCE(rooms.label, temperatures.room_key) AS label,
-               temperatures.timestamp AS timestamp,
-               temperatures.temperature AS temperature
+               temperatures.room_key,
+               COALESCE(labels.label, temperatures.room_key),
+               temperatures.timestamp,
+               temperatures.temperature,
+               temperatures.expected_temperature
              FROM temperatures
-             LEFT JOIN rooms ON rooms.key = temperatures.room_key
+             LEFT JOIN labels ON labels.key = temperatures.room_key
              WHERE temperatures.room_key = ?
              ORDER BY temperatures.timestamp DESC LIMIT 1",
             params![room_key],
             |row| {
-                Ok(HashMap::from([
+                let mut result = HashMap::from([
                     ("key", row.get::<_, String>(0)?),
                     ("label", row.get::<_, String>(1)?),
                     ("timestamp", row.get::<_, String>(2)?),
                     ("temperature", row.get::<_, f32>(3)?.to_string()),
-                ]))
+                ]);
+                if let Some(expected_temp) = row.get::<_, Option<f32>>(4)? {
+                    result.insert("expected_temperature", expected_temp.to_string());
+                }
+                Ok(result)
             },
         )
     })
-    .map_err(|e| match e.downcast_ref::<rusqlite::Error>() {
-        Some(rusqlite::Error::QueryReturnedNoRows) => rusqlite::Error::QueryReturnedNoRows,
-        _ => rusqlite::Error::ExecuteReturnedResults,
+    .map_err(|e| {
+        let err_msg = format!(
+            "Failed to get latest temperature for room {}: {}",
+            room_key, e
+        );
+        log::error!("{}", err_msg);
+        NeuroheatError::DatabaseError(err_msg)
     })
 }
 
 pub fn get_latest_temperatures(
     conn: &Arc<Mutex<Connection>>,
-) -> SqliteResult<HashMap<String, HashMap<&'static str, String>>> {
+) -> Result<HashMap<String, HashMap<&'static str, String>>, NeuroheatError> {
     db::with_locked_connection(conn, |conn| {
         let mut stmt = conn.prepare(
             "SELECT
-               temperatures.room_key AS key,
-               COALESCE(rooms.label, temperatures.room_key) AS label,
-               temperatures.timestamp AS timestamp,
-               temperatures.temperature AS temperature
-             FROM rooms
-             LEFT JOIN temperatures ON rooms.key = temperatures.room_key
+               temperatures.room_key,
+               COALESCE(labels.label, temperatures.room_key),
+               temperatures.timestamp,
+               temperatures.temperature,
+               temperatures.expected_temperature
+             FROM labels
+             LEFT JOIN temperatures ON labels.key = temperatures.room_key
              AND temperatures.timestamp = (
                  SELECT MAX(timestamp)
                  FROM temperatures
-                 WHERE room_key = rooms.key
+                 WHERE room_key = labels.key
              )",
         )?;
 
@@ -102,12 +125,16 @@ pub fn get_latest_temperatures(
                 let label = row.get::<_, String>(1)?;
                 let timestamp = row.get::<_, String>(2)?;
                 let temperature = row.get::<_, f32>(3)?.to_string();
+                let expected_temperature = row
+                    .get::<_, Option<f32>>(4)?
+                    .map_or("".to_string(), |v| v.to_string());
                 Ok((
                     key,
                     HashMap::from([
                         ("label", label),
                         ("timestamp", timestamp),
                         ("temperature", temperature),
+                        ("expected_temperature", expected_temperature),
                     ]),
                 ))
             })?
@@ -115,9 +142,10 @@ pub fn get_latest_temperatures(
 
         Ok(result)
     })
-    .map_err(|e| match e.downcast_ref::<rusqlite::Error>() {
-        Some(rusqlite::Error::QueryReturnedNoRows) => rusqlite::Error::QueryReturnedNoRows,
-        _ => rusqlite::Error::ExecuteReturnedResults,
+    .map_err(|e| {
+        let err_msg = format!("Failed to get latest temperatures: {}", e);
+        log::error!("{}", err_msg);
+        NeuroheatError::DatabaseError(err_msg)
     })
 }
 
@@ -125,14 +153,17 @@ pub fn store_temperature(
     conn: &Arc<Mutex<Connection>>,
     room_key: &str,
     temperature: f32,
-) -> SqliteResult<()> {
+    expected_temperature: Option<f32>,
+) -> Result<(), NeuroheatError> {
     db::with_locked_connection(conn, |conn| {
         conn.execute(
-            "INSERT INTO temperatures (room_key, temperature) VALUES (?1, ?2)",
-            params![room_key, temperature],
-        )?;
-
-        Ok(())
+            "INSERT INTO temperatures (room_key, temperature, expected_temperature) VALUES (?1, ?2, ?3)",
+            params![room_key, temperature, expected_temperature],
+        ).map(|_| ())
     })
-    .map_err(|_e| rusqlite::Error::ExecuteReturnedResults)
+    .map_err(|e| {
+        let err_msg = format!("Failed to store temperature for room {}: {}", room_key, e);
+        log::error!("{}", err_msg);
+        NeuroheatError::DatabaseError(err_msg)
+    })
 }
