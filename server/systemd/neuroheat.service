@@ -5,7 +5,7 @@ After=local-fs.target network-online.target
 [Service]
 Type=simple
 WorkingDirectory=/opt/neuroheat
-Environment="HOME=/opt/heating_brain"
+Environment="HOME=/opt/neuroheat"
 
 ExecStart=/opt/neuroheat/bin/neuroheat --api-port=3030 --database-path=/srv/neuroheat/neuroheat.db --heating-config-path=/srv/neuroheat/heating_config.json --log-level=info
 
