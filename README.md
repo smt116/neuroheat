@@ -1,6 +1,6 @@
 # Neuroheat
 
-This is another version of the Heating Brain hobby project - an Elixir application for controlling the floor heating system in the house. It utilizes a Raspberry PI Zero, a relay controller, and a few 1-wire temperature sensors. The original Elixir application ran for over three years without any issues (except for CPU and memory utilization when rendering data). It provided around 20-30% savings in gas consumption compared to the previous "industry standard" devices (mainly due to optimized logic for enabling and disabling heating in the context of the required heat area).
+This is another version of the [Heating Brain](https://github.com/smt116/heating-brain) hobby project - an Elixir application for controlling the floor heating system in the house. It utilizes a Raspberry PI Zero, a relay controller, and a few 1-wire temperature sensors. The original Elixir application ran for over three years without any issues (except for CPU and memory utilization when rendering data). It provided around 20-30% savings in gas consumption compared to the previous "industry standard" devices (mainly due to optimized logic for enabling and disabling heating in the context of the required heat area).
 
 **Disclaimer:** This is a hobby project, and I do not take any responsibility for any issues or damages that may arise from running this software. Use it at your own risk.
 
