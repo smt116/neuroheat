@@ -125,18 +125,15 @@ pub fn get_latest_temperatures(
                 let label = row.get::<_, String>(1)?;
                 let timestamp = row.get::<_, String>(2)?;
                 let temperature = row.get::<_, f32>(3)?.to_string();
-                let expected_temperature = row
-                    .get::<_, Option<f32>>(4)?
-                    .map_or("".to_string(), |v| v.to_string());
-                Ok((
-                    key,
-                    HashMap::from([
-                        ("label", label),
-                        ("timestamp", timestamp),
-                        ("temperature", temperature),
-                        ("expected_temperature", expected_temperature),
-                    ]),
-                ))
+                let mut map = HashMap::from([
+                    ("label", label),
+                    ("timestamp", timestamp),
+                    ("temperature", temperature),
+                ]);
+                if let Some(expected_temp) = row.get::<_, Option<f32>>(4)? {
+                    map.insert("expected_temperature", expected_temp.to_string());
+                }
+                Ok((key, map))
             })?
             .collect::<Result<HashMap<_, _>, _>>()?;
 
