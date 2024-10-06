@@ -1,0 +1,32 @@
+{
+  "rooms": [
+    {
+      "key": "bathroom",
+      "name": "Bathroom",
+      "sensor_id": "28-01187xxxx0ff",
+      "valve_pin": 1,
+      "area": 12.3,
+      "temperature_schedule": [
+        { "start_hour": 0, "end_hour": 6, "temperature": 19.0 },
+        { "start_hour": 6, "end_hour": 19, "temperature": 21.0 },
+        { "start_hour": 19, "end_hour": 21, "temperature": 20.0 },
+        { "start_hour": 21, "end_hour": 24, "temperature": 19.0 }
+      ]
+    },
+    {
+      "key": "living_room",
+      "name": "Living Room",
+      "sensor_id": "28-01195xxxx9ff",
+      "valve_pin": 2,
+      "area": 45.6,
+      "temperature_schedule": [
+        { "start_hour": 0, "end_hour": 6, "temperature": 18.5 },
+        { "start_hour": 6, "end_hour": 19, "temperature": 21.0 },
+        { "start_hour": 19, "end_hour": 21, "temperature": 20.0 },
+        { "start_hour": 21, "end_hour": 24, "temperature": 18.5 }
+      ]
+    }
+  ],
+  "stove_pin": 0,
+  "pipe_sensor_id": "28-01187xxxx6ff"
+}

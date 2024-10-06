@@ -1,0 +1,23 @@
+[Unit]
+Description=Neuroheat Application
+After=local-fs.target network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/neuroheat
+Environment="HOME=/opt/heating_brain"
+
+ExecStart=/opt/neuroheat/bin/neuroheat --api-port=3030 --database-path=/srv/neuroheat/neuroheat.db --heating-config-path=/srv/neuroheat/heating_config.json --log-level=info
+
+Restart=always
+RestartSec=60s
+TimeoutStopSec=30s
+
+OOMScoreAdjust=500
+
+StandardError=syslog
+StandardOutput=syslog
+SyslogIdentifier=neuroheat
+
+[Install]
+WantedBy=multi-user.target

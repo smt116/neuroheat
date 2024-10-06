@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+
+set -o errexit
+set -o nounset
+set -o pipefail
+
+if [[ "${1:-}" == "--debug" ]]; then
+  set -o xtrace
+fi
+
+green=`tput setaf 2`
+yellow=`tput setaf 3`
+blue=`tput setaf 4`
+reset=`tput sgr0`
+
+function label() {
+  echo
+  echo "${green}$1${reset}"
+}
+
+function run() {
+  echo "${blue}Running ${yellow}$@${reset}"
+  eval $@
+}
+
+readonly PLATFORM=arm-unknown-linux-musleabihf
+readonly STAMP=$(date +'%Y.%m.%d.%H.%M')
+readonly TARGET_HOST=neuroheat
+readonly TARGET_PATH=/opt/neuroheat
+readonly TARGET_BACKUPS_PATH=/srv/backups
+readonly TARGET_DATA_PATH=/srv/neuroheat
+
+label "Building the release version..."
+run "cargo build --release"
+
+label "Checking if neuroheat service is active..."
+if ssh ${TARGET_HOST} "systemctl is-active --quiet neuroheat.service"; then
+  label "Stopping neuroheat service..."
+  run "ssh ${TARGET_HOST} \"sudo systemctl stop neuroheat.service\""
+else
+  label "neuroheat service is not active."
+fi
+
+label "Backing up database..."
+run "ssh ${TARGET_HOST} \"[ -f ${TARGET_DATA_PATH}/neuroheat.db ] && cp ${TARGET_DATA_PATH}/neuroheat.db ${TARGET_BACKUPS_PATH}/neuroheat.db.$(date +'%Y.%m.%d.%H.%M').bak || echo 'Database file does not exist, skipping backup.'\""
+
+label "Backing up heating configuration file..."
+run "ssh ${TARGET_HOST} \"[ -f ${TARGET_DATA_PATH}/neuroheat.db ] && cp ${TARGET_DATA_PATH}/heating_config.json ${TARGET_BACKUPS_PATH}/heating_config.json.bak || echo 'Heating configuration file does not exist, skipping backup.'\""
+
+label "Uploading binary to the server..."
+run "scp target/${PLATFORM}/release/neuroheat ${TARGET_HOST}:${TARGET_PATH}/bin/neuroheat"
+
+label "Uploading service unit..."
+run "scp server/systemd/neuroheat.service ${TARGET_HOST}:${TARGET_DATA_PATH}/neuroheat.service"
+
+label "Uploading heating configuration file..."
+run "scp heating_config.json ${TARGET_HOST}:${TARGET_DATA_PATH}/heating_config.json"
+
+label "Linking neuroheat service..."
+run "ssh ${TARGET_HOST} \"sudo ln -sf ${TARGET_DATA_PATH}/neuroheat.service /etc/systemd/system/neuroheat.service\""
+
+label "Reloading systemd daemon..."
+run "ssh ${TARGET_HOST} \"sudo systemctl daemon-reload\""
+
+label "Enabling neuroheat service..."
+run "ssh ${TARGET_HOST} \"sudo systemctl enable neuroheat.service\""
+
+label "Starting neuroheat service..."
+run "ssh ${TARGET_HOST} \"sudo systemctl start neuroheat.service\""
