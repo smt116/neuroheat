@@ -26,7 +26,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let shared_conn = Arc::new(Mutex::new(conn));
 
     // initialize database if necessary
-    repo::init(&shared_conn, &config)?;
+    db::init(&shared_conn, &config)?;
 
     // start scheduler (e.g., reading data from sensors)
     scheduler::start_scheduler(Arc::clone(&config), Arc::clone(&shared_conn)).await?;

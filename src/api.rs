@@ -39,13 +39,13 @@ async fn get_all_temperatures(
 }
 
 async fn get_temperature_by_room(
-    room: String,
+    key: String,
     conn: Arc<Mutex<Connection>>,
 ) -> Result<impl warp::Reply, warp::Rejection> {
-    match repo::get_latest_temperature(&conn, &room) {
+    match repo::get_latest_temperature(&conn, &key) {
         Ok(result) => Ok(warp::reply::json(&result)),
         Err(e) => {
-            log::error!("Failed to get temperature for room {}: {}", room, e);
+            log::error!("Failed to get temperature for key {}: {}", key, e);
             Err(warp::reject::not_found())
         }
     }
