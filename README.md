@@ -1,18 +1,12 @@
 # Neuroheat
 
-This is another version of Heating Brain hobby project - Elixir application for
-controlling floor heating system in the house. It utilizes Raspberry PI Zero,
-a relay controller, and few 1-wire temperature sensors. The original Elixir
-application was running for over three years without any issues (except CPU
-and memory utilization when rendering data). It gave around 20-30% savings
-in gas consumption comparing to the previous "industry standard" devices
-(mainly because optimized logic for enabling and disabling heating in context
-of required heat area).
+This is another version of the Heating Brain hobby project - an Elixir application for controlling the floor heating system in the house. It utilizes a Raspberry PI Zero, a relay controller, and a few 1-wire temperature sensors. The original Elixir application ran for over three years without any issues (except for CPU and memory utilization when rendering data). It provided around 20-30% savings in gas consumption compared to the previous "industry standard" devices (mainly due to optimized logic for enabling and disabling heating in the context of the required heat area).
+
+**Disclaimer:** This is a hobby project, and I do not take any responsibility for any issues or damages that may arise from running this software. Use it at your own risk.
 
 ## Development
 
-Install tools required by `.tool-versions` file and ensure you have the
-following system packages installed on your macOC:
+Install tools required by the `.tool-versions` file and ensure you have the following system packages installed on your macOS:
 
 ```
 brew install arm-unknown-linux-musleabihf
@@ -21,22 +15,53 @@ rustup target add arm-unknown-linux-musleabihf
 
 ## Deployment
 
-There is `bin/deploy` script that builds the binary file and performs actions
-on the remote server (e.g., backing up database, updating systemd service, etc.).
-Make sure to reving the heating configuration (e.g., GPIO pins, sensor
-identifiers, etc.).
+There is a `bin/deploy` script that builds the binary file and performs actions on the remote server (e.g., backing up the database, updating the systemd service, etc.). Make sure to review the heating configuration (e.g., GPIO pins, sensor identifiers, etc.).
 
-You will have to setup the server and create `heating_config.json` (see
-`heating_config.json.sample`) if running of the first time.
+If deploying for the first time, you will have to set up the server (see Raspberry Pi Zero Setup section) and create `heating_config.json` (see `heating_config.json.sample`).
+
+### Accessing the database console
+
+Install `sudo apt install -y sqlite` and run:
+
+```
+sqlite3 /srv/neuroheat/neuroheat.db
+```
+
+### Accessing logs
+
+```
+journalctl --unit neuroheat.service --lines=50 --follow
+```
+
+### Incompatible changes in the database schema
+
+This is a hobby project, so it does not implement any migration mechanism (yet?). If there are changes in the schema (i.e., `src/repo.rs`'s init function), you may need to re-initialize the database:
+
+1. Stop the service on the server:
+
+    ```
+    sudo systemctl stop neuroheat.service
+    ```
+
+1. Remove the database on the server:
+
+    ```
+    sudo rm /srv/neuroheat/neuroheat.db
+    ```
+
+1. Let the application initialize it from scratch on startup:
+
+    ```
+    ./bin/deploy
+    ```
 
 ## Raspberry Pi Zero Setup
 
 ### On the memory card
 
-1. Install [Raspbian Buster Lite](https://www.raspberrypi.org/downloads/raspbian/) on the memory card. See [official documentation](https://www.raspberrypi.o
-rg/documentation/installation/installing-images/README.md) for details.
-1. Copy `server/config.txt` into the card (as `config.txt`).
-1. Configure network connection by creating `wpa_supplicant.conf` file on the card with the following content (adjust the credentials):
+1. Install [Raspbian Buster Lite](https://www.raspberrypi.org/downloads/raspbian/) on the memory card. See [official documentation](https://www.raspberrypi.org/documentation/installation/installing-images/README.md) for details.
+1. Copy `server/config.txt` onto the card (as `config.txt`).
+1. Configure the network connection by creating a `wpa_supplicant.conf` file on the card with the following content (adjust the credentials):
 
     ```
     country=PL
@@ -48,9 +73,9 @@ rg/documentation/installation/installing-images/README.md) for details.
         key_mgmt=WPA-PSK
     }
     ```
-1. Enable SSH by creating `ssh` file.
+1. Enable SSH by creating an `ssh` file.
 
-### From host system after booting the server:
+### From the host system after booting the server:
 
 1. [Allow password-less SSH connections](https://www.raspberrypi.org/documentation/remote-access/ssh/passwordless.md):
 
@@ -81,7 +106,7 @@ rg/documentation/installation/installing-images/README.md) for details.
     sudo passwd pi
     ```
 
-1. Upgrade distro:
+1. Upgrade the distro:
 
     ```
     sudo apt-get update
@@ -89,7 +114,7 @@ rg/documentation/installation/installing-images/README.md) for details.
     sudo apt-get autoclean
     ```
 
-1. Set local timezone:
+1. Set the local timezone:
 
     ```
     sudo timedatectl set-timezone Europe/Warsaw
@@ -150,7 +175,7 @@ rg/documentation/installation/installing-images/README.md) for details.
     15 10 * * * find /srv/backups -type f -mtime +14 -ls -exec rm -f -- {} \;
     ```
 
-### From host system after setting up the server:
+### From the host system after setting up the server:
 
 1. Deploy the code:
 
