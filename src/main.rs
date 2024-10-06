@@ -3,6 +3,7 @@ mod cli;
 mod db;
 mod error;
 mod heating_configuration;
+mod relay;
 mod repo;
 mod scheduler;
 mod temperature_sensor;

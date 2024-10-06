@@ -59,6 +59,17 @@ pub fn init(
             [],
         )?;
 
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS states (
+              id INTEGER PRIMARY KEY,
+              key TEXT NOT NULL,
+              state INTEGER NOT NULL,
+              timestamp TEXT NOT NULL DEFAULT (datetime('now', 'utc')),
+              FOREIGN KEY(key) REFERENCES labels(key)
+          )",
+            [],
+        )?;
+
         for room in &config.rooms {
             conn.execute(
                 "INSERT OR IGNORE INTO labels (key, label) VALUES (?1, ?2)",
@@ -70,6 +81,12 @@ pub fn init(
         conn.execute(
             "INSERT OR IGNORE INTO labels (key, label) VALUES (?1, ?2)",
             params!["pipe", "Heating Pipe"],
+        )?;
+
+        // Insert a value for the stove as "Stove"
+        conn.execute(
+            "INSERT OR IGNORE INTO labels (key, label) VALUES (?1, ?2)",
+            params!["stove", "Stove"],
         )?;
 
         Ok(())

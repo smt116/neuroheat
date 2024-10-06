@@ -27,7 +27,7 @@ in mind that the scheduler needs to populate some data before
 you will see any results (prior to that, it will return HTTP 404).
 
 ```
-neuroheat λ curl heating-brain.local:3030/api/temperatures/office | jq
+neuroheat λ curl neuroheat.local:3030/api/temperatures/office | jq
 {
   "timestamp": "2024-10-06 10:32:03",
   "temperature": "21.937",
@@ -38,42 +38,52 @@ neuroheat λ curl heating-brain.local:3030/api/temperatures/office | jq
 ```
 
 ```
-neuroheat λ curl neurobrain.local:3030/api/temperatures | jq
+neuroheat λ curl neuroheat.local:3030/api/state | jq
 {
-  "office": {
-    "temperature": "21.937",
-    "label": "Office",
-    "timestamp": "2024-10-06 10:30:03",
-    "expected_temperature": "21"
-  },
   "living_room": {
     "label": "Living Room",
-    "temperature": "22",
-    "timestamp": "2024-10-06 10:30:02",
+    "timestamp": "2024-10-06 11:16:03",
+    "heating_enabled": "false",
+    "temperature": "22.5",
     "expected_temperature": "21"
   },
-  "bedroom": {
-    "timestamp": "2024-10-06 10:30:04",
-    "expected_temperature": "18.5",
-    "temperature": "19.687",
-    "label": "Bedroom"
-  },
-  "guest_room": {
-    "temperature": "19.312",
-    "timestamp": "2024-10-06 10:30:05",
-    "expected_temperature": "18.5",
-    "label": "Guest Room"
+  "pipe": {
+    "label": "Heating Pipe",
+    "timestamp": "2024-10-06 11:16:01",
+    "temperature": "30.375"
   },
   "bathroom": {
-    "temperature": "21.5",
-    "expected_temperature": "21",
     "label": "Bathroom",
-    "timestamp": "2024-10-06 10:30:01"
+    "timestamp": "2024-10-06 11:16:02",
+    "temperature": "21.625",
+    "expected_temperature": "21",
+    "heating_enabled": "false"
   },
-  "pipe": {
-    "temperature": "37.25",
-    "timestamp": "2024-10-06 10:30:01",
-    "label": "Heating Pipe"
+  "office": {
+    "temperature": "22.312",
+    "timestamp": "2024-10-06 11:16:03",
+    "label": "Office",
+    "expected_temperature": "21",
+    "heating_enabled": "false"
+  },
+  "bedroom": {
+    "label": "Bedroom",
+    "expected_temperature": "18.5",
+    "timestamp": "2024-10-06 11:16:04",
+    "temperature": "20",
+    "heating_enabled": "false"
+  },
+  "guest_room": {
+    "label": "Guest Room",
+    "timestamp": "2024-10-06 11:16:05",
+    "temperature": "19.625",
+    "expected_temperature": "18.5",
+    "heating_enabled": "false"
+  },
+  "stove": {
+    "label": "Stove",
+    "heating_enabled": "false",
+    "timestamp": "2024-10-06 11:16:05"
   }
 }
 ```

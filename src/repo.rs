@@ -5,6 +5,91 @@ use std::sync::{Arc, Mutex};
 use crate::db;
 use crate::error::NeuroheatError;
 
+pub fn get_current_state(
+    conn: &Arc<Mutex<Connection>>,
+) -> Result<HashMap<String, HashMap<&'static str, String>>, NeuroheatError> {
+    db::with_locked_connection(conn, |conn| {
+        let mut stmt = conn.prepare(
+            "SELECT
+                 temperatures.key,
+                 COALESCE(labels.label, temperatures.key),
+                 temperatures.timestamp,
+                 temperatures.temperature,
+                 temperatures.expected_temperature,
+                 states.state
+               FROM labels
+               LEFT JOIN temperatures ON labels.key = temperatures.key
+               AND temperatures.timestamp = (
+                   SELECT MAX(timestamp)
+                   FROM temperatures
+                   WHERE key = labels.key
+               )
+               LEFT JOIN states ON labels.key = states.key
+               AND states.timestamp = (
+                   SELECT MAX(timestamp)
+                   FROM states
+                   WHERE key = labels.key
+               )
+               WHERE temperatures.key IS NOT NULL",
+        )?;
+
+        let mut result = stmt
+            .query_map([], |row| {
+                let key = row.get::<_, String>(0)?;
+                let label = row.get::<_, String>(1)?;
+                let timestamp = row.get::<_, String>(2)?;
+                let temperature = row.get::<_, f32>(3)?.to_string();
+                let mut map = HashMap::from([
+                    ("label", label),
+                    ("timestamp", timestamp),
+                    ("temperature", temperature),
+                ]);
+                if let Some(expected_temp) = row.get::<_, Option<f32>>(4)? {
+                    map.insert("expected_temperature", expected_temp.to_string());
+                }
+                if let Some(state) = row.get::<_, Option<i32>>(5)? {
+                    map.insert("heating_enabled", (state != 0).to_string());
+                }
+                Ok((key, map))
+            })?
+            .collect::<Result<HashMap<_, _>, _>>()?;
+
+        let stove_state = conn.query_row(
+            "SELECT
+               states.key,
+               COALESCE(labels.label, states.key),
+               states.timestamp,
+               states.state
+             FROM states
+             LEFT JOIN labels ON labels.key = states.key
+             WHERE states.key = 'stove'
+             ORDER BY states.timestamp DESC LIMIT 1",
+            [],
+            |row| {
+                let key = row.get::<_, String>(0)?;
+                let label = row.get::<_, String>(1)?;
+                let timestamp = row.get::<_, String>(2)?;
+                let state = (row.get::<_, i32>(3)? != 0).to_string();
+                let map = HashMap::from([
+                    ("label", label),
+                    ("timestamp", timestamp),
+                    ("heating_enabled", state),
+                ]);
+                Ok((key, map))
+            },
+        )?;
+
+        result.insert("stove".to_string(), stove_state.1);
+
+        Ok(result)
+    })
+    .map_err(|e| {
+        let err_msg = format!("Failed to get current state: {}", e);
+        log::error!("{}", err_msg);
+        NeuroheatError::DatabaseError(err_msg)
+    })
+}
+
 pub fn get_latest_temperature(
     conn: &Arc<Mutex<Connection>>,
     key: &str,
@@ -105,6 +190,25 @@ pub fn store_temperature(
     })
     .map_err(|e| {
         let err_msg = format!("Failed to store temperature for key {}: {}", key, e);
+        log::error!("{}", err_msg);
+        NeuroheatError::DatabaseError(err_msg)
+    })
+}
+
+pub fn store_state(
+    conn: &Arc<Mutex<Connection>>,
+    key: &str,
+    state: bool,
+) -> Result<(), NeuroheatError> {
+    db::with_locked_connection(conn, |conn| {
+        conn.execute(
+            "INSERT INTO states (key, state) VALUES (?1, ?2)",
+            params![key, state as i32],
+        )
+        .map(|_| ())
+    })
+    .map_err(|e| {
+        let err_msg = format!("Failed to store state for key {}: {}", key, e);
         log::error!("{}", err_msg);
         NeuroheatError::DatabaseError(err_msg)
     })

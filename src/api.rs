@@ -21,9 +21,25 @@ pub async fn start_server(conn: Arc<Mutex<Connection>>, port: u16) {
         .and_then(get_temperature_by_room)
         .with(log);
 
-    let routes = temperature_by_room.or(temperatures);
+    let state = warp::path!("api" / "state")
+        .and(warp::get())
+        .and(with_db(conn.clone()))
+        .and_then(get_state)
+        .with(log);
+
+    let routes = temperature_by_room.or(temperatures).or(state);
 
     warp::serve(routes).run(([0, 0, 0, 0], port)).await;
+}
+
+async fn get_state(conn: Arc<Mutex<Connection>>) -> Result<impl warp::Reply, warp::Rejection> {
+    match repo::get_current_state(&conn) {
+        Ok(result) => Ok(warp::reply::json(&result)),
+        Err(e) => {
+            log::error!("Failed to get current state: {}", e);
+            Err(warp::reject::not_found())
+        }
+    }
 }
 
 async fn get_all_temperatures(

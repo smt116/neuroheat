@@ -6,6 +6,7 @@ pub enum NeuroheatError {
     DatabaseError(String),
     SensorError(String),
     ConfigurationError(String),
+    RelayError(String),
 }
 
 impl fmt::Display for NeuroheatError {
@@ -14,6 +15,7 @@ impl fmt::Display for NeuroheatError {
             NeuroheatError::DatabaseError(msg) => write!(f, "Database error: {}", msg),
             NeuroheatError::SensorError(msg) => write!(f, "Sensor error: {}", msg),
             NeuroheatError::ConfigurationError(msg) => write!(f, "Configuration error: {}", msg),
+            NeuroheatError::RelayError(msg) => write!(f, "Relay error: {}", msg),
         }
     }
 }

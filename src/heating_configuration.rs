@@ -1,4 +1,5 @@
 use crate::error::NeuroheatError;
+use crate::relay::{GPIOReader, RelayStateReader};
 use crate::temperature_sensor::{TemperatureSensor, DS18B20};
 
 use chrono::{Local, Timelike};
@@ -25,6 +26,9 @@ pub struct Room {
     pub area: f32,
     /// The temperature schedule for the room.
     pub temperature_schedule: Vec<TemperatureSchedule>,
+    /// The relay reader for the valve.
+    #[serde(skip)]
+    pub valve_reader: Option<Arc<dyn RelayStateReader>>,
 }
 
 /// Represents a temperature schedule for a room.
@@ -50,6 +54,9 @@ pub struct HeatingConfiguration {
     /// The temperature sensor for the heating pipe.
     #[serde(skip)]
     pub pipe_sensor: Option<Arc<dyn TemperatureSensor>>,
+    /// The relay reader for the stove.
+    #[serde(skip)]
+    pub stove_reader: Option<Arc<dyn RelayStateReader>>,
 }
 
 impl HeatingConfiguration {
@@ -67,11 +74,12 @@ impl HeatingConfiguration {
             NeuroheatError::ConfigurationError(err_msg)
         })?;
 
-        // Initialize sensors
         for room in &mut config.rooms {
             room.sensor = Some(Arc::new(DS18B20::new(room.sensor_id.clone())));
+            room.valve_reader = Some(Arc::new(GPIOReader::new(room.valve_pin)));
         }
         config.pipe_sensor = Some(Arc::new(DS18B20::new(config.pipe_sensor_id.clone())));
+        config.stove_reader = Some(Arc::new(GPIOReader::new(config.stove_pin)));
 
         Ok(config)
     }
