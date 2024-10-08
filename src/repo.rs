@@ -163,56 +163,6 @@ pub fn get_latest_temperature(
     })
 }
 
-pub fn get_latest_temperatures(
-    conn: &Arc<Mutex<Connection>>,
-) -> Result<HashMap<String, HashMap<&'static str, String>>, NeuroheatError> {
-    db::with_locked_connection(conn, |conn| {
-        let mut stmt = conn.prepare(
-            "SELECT
-               temperatures.key,
-               COALESCE(labels.label, temperatures.key),
-               temperatures.timestamp,
-               temperatures.temperature,
-               temperatures.expected_temperature
-             FROM labels
-             LEFT JOIN temperatures ON labels.key = temperatures.key
-             AND temperatures.timestamp = (
-                 SELECT MAX(timestamp)
-                 FROM temperatures
-                 WHERE key = labels.key
-             )",
-        )?;
-
-        let result = stmt
-            .query_map([], |row| {
-                let key = row.get::<_, String>(0)?;
-                let label = row.get::<_, String>(1)?;
-                let timestamp =
-                    NaiveDateTime::parse_from_str(&row.get::<_, String>(2)?, "%Y-%m-%d %H:%M:%S")
-                        .map(|dt| dt.and_utc().to_string())
-                        .unwrap();
-                let temperature = row.get::<_, f32>(3)?.to_string();
-                let mut map = HashMap::from([
-                    ("label", label),
-                    ("timestamp", timestamp),
-                    ("temperature", temperature),
-                ]);
-                if let Some(expected_temp) = row.get::<_, Option<f32>>(4)? {
-                    map.insert("expected_temperature", expected_temp.to_string());
-                }
-                Ok((key, map))
-            })?
-            .collect::<Result<HashMap<_, _>, _>>()?;
-
-        Ok(result)
-    })
-    .map_err(|e| {
-        let err_msg = format!("Failed to get latest temperatures: {}", e);
-        log::error!("{}", err_msg);
-        NeuroheatError::DatabaseError(err_msg)
-    })
-}
-
 pub fn get_temperatures_since(
     conn: &Arc<Mutex<Connection>>,
     key: &str,
