@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+
+set -e
+
+. "$(dirname "$0")/utils.sh"
+
+readonly CONFIG_FILE="/srv/neuroheat/heating_config.json"
+
+# Extract GPIO pins from the JSON configuration file
+valve_pins=$(jq -r '.rooms[].valve_pin' "$CONFIG_FILE")
+stove_pin=$(jq -r '.stove_pin' "$CONFIG_FILE")
+
+label "Enabling valves..."
+echo "$valve_pins" | while IFS= read -r gpio; do
+  run "echo 0 > /sys/class/gpio/gpio${gpio}/value"
+done
+
+label "Enabling heating..."
+run "echo 0 > /sys/class/gpio/gpio${stove_pin}/value"

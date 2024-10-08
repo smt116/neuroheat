@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+
+set -e
+
+. "$(dirname "$0")/utils.sh"
+
+readonly TARGET_BACKUPS_PATH=/srv/backups
+readonly TARGET_DATA_PATH=/srv/neuroheat
+
+label "Backing up database..."
+if [ -f "${TARGET_DATA_PATH}/neuroheat.db" ]; then
+  run "cp ${TARGET_DATA_PATH}/neuroheat.db ${TARGET_BACKUPS_PATH}/neuroheat.db.$(date +'%Y.%m.%d.%H.%M').bak"
+else
+  echo "Database file does not exist, skipping backup."
+fi
+
+label "Backing up heating configuration file..."
+if [ -f "${TARGET_DATA_PATH}/heating_config.json" ]; then
+  run "cp ${TARGET_DATA_PATH}/heating_config.json ${TARGET_BACKUPS_PATH}/heating_config.json.bak"
+else
+  echo "Heating configuration file does not exist, skipping backup."
+fi

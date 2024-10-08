@@ -248,6 +248,12 @@ This is a hobby project, so it does not implement any migration mechanism (yet?)
     15 10 * * * find /srv/backups -type f -mtime +14 -ls -exec rm -f -- {} \;
     ```
 
+1. Install `jq` for `server/bin` helper scripts:
+
+    ```sh
+    sudo apt-get install jq
+    ```
+
 ### From the host system after setting up the server:
 
 1. Deploy the code:
