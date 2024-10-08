@@ -47,19 +47,16 @@ impl TemperatureSensor for DS18B20 {
         let mut lines = reader.lines();
         let first_line = lines.next().ok_or_else(|| {
             let err_msg = "No first line".to_string();
-            log::error!("{}", err_msg);
             NeuroheatError::SensorError(err_msg)
         })??;
 
         if !first_line.ends_with("YES") {
             let err_msg = "CRC check failed".to_string();
-            log::error!("{}", err_msg);
             return Err(NeuroheatError::SensorError(err_msg));
         }
 
         let second_line = lines.next().ok_or_else(|| {
             let err_msg = "No second line".to_string();
-            log::error!("{}", err_msg);
             NeuroheatError::SensorError(err_msg)
         })??;
 
@@ -67,14 +64,12 @@ impl TemperatureSensor for DS18B20 {
             let temp_str = &second_line[pos + 2..];
             let temp_millidegrees: i32 = temp_str.parse().map_err(|_| {
                 let err_msg = "Failed to parse temperature".to_string();
-                log::error!("{}", err_msg);
                 NeuroheatError::SensorError(err_msg)
             })?;
             let temperature = temp_millidegrees as f32 / 1000.0;
 
             if temperature < 0.0 || temperature > 50.0 {
                 let err_msg = format!("Temperature out of range: {:.1}°C", temperature);
-                log::error!("{}", err_msg);
                 Err(NeuroheatError::SensorError(err_msg))
             } else {
                 Ok(temperature)
