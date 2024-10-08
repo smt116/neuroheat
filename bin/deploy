@@ -8,10 +8,10 @@ if [[ "${1:-}" == "--debug" ]]; then
   set -o xtrace
 fi
 
-green=`tput setaf 2`
-yellow=`tput setaf 3`
-blue=`tput setaf 4`
-reset=`tput sgr0`
+green=$(tput setaf 2)
+yellow=$(tput setaf 3)
+blue=$(tput setaf 4)
+reset=$(tput sgr0)
 
 function label() {
   echo
@@ -19,8 +19,8 @@ function label() {
 }
 
 function run() {
-  echo "${blue}Running ${yellow}$@${reset}"
-  eval $@
+  echo "${blue}Running ${yellow}$*${reset}"
+  eval "$@"
 }
 
 readonly PLATFORM=arm-unknown-linux-musleabihf
@@ -34,7 +34,7 @@ label "Building the release version..."
 run "cargo build --release"
 
 label "Checking if neuroheat service is active..."
-if ssh ${TARGET_HOST} "systemctl is-active --quiet neuroheat.service"; then
+if ssh "${TARGET_HOST}" "systemctl is-active --quiet neuroheat.service"; then
   label "Stopping neuroheat service..."
   run "ssh ${TARGET_HOST} \"sudo systemctl stop neuroheat.service\""
 else
@@ -45,7 +45,7 @@ label "Backing up database..."
 run "ssh ${TARGET_HOST} \"[ -f ${TARGET_DATA_PATH}/neuroheat.db ] && cp ${TARGET_DATA_PATH}/neuroheat.db ${TARGET_BACKUPS_PATH}/neuroheat.db.$(date +'%Y.%m.%d.%H.%M').bak || echo 'Database file does not exist, skipping backup.'\""
 
 label "Backing up heating configuration file..."
-run "ssh ${TARGET_HOST} \"[ -f ${TARGET_DATA_PATH}/neuroheat.db ] && cp ${TARGET_DATA_PATH}/heating_config.json ${TARGET_BACKUPS_PATH}/heating_config.json.bak || echo 'Heating configuration file does not exist, skipping backup.'\""
+run "ssh ${TARGET_HOST} \"[ -f ${TARGET_DATA_PATH}/heating_config.json ] && cp ${TARGET_DATA_PATH}/heating_config.json ${TARGET_BACKUPS_PATH}/heating_config.json.bak || echo 'Heating configuration file does not exist, skipping backup.'\""
 
 label "Uploading binary to the server..."
 run "scp target/${PLATFORM}/release/neuroheat ${TARGET_HOST}:${TARGET_PATH}/bin/neuroheat"
