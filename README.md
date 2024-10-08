@@ -13,6 +13,10 @@ brew install arm-unknown-linux-musleabihf
 rustup target add arm-unknown-linux-musleabihf
 ```
 
+## Heating-related logic
+
+See `src/controller.rs` and `src/scheduler.rs` for the main logic of the heating system. The controller is responsible for turning the heating on and off based on the temperature readings from the sensors and the expected temperature (according to the `heating_config.json` file). The scheduler is a cron-like worker that reads temperatures and calls the controller for valves and the stove. You may want to adjust constants in those files (e.g., the minimal floor heating area that is open before turning on the stove).
+
 ## Deployment
 
 There is a `bin/deploy` script that builds the binary file and performs actions on the remote server (e.g., backing up the database, updating the systemd service, etc.). Make sure to review the heating configuration (e.g., GPIO pins, sensor identifiers, etc.).

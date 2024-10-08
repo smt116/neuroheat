@@ -1,5 +1,6 @@
 mod api;
 mod cli;
+mod controller;
 mod db;
 mod error;
 mod heating_configuration;

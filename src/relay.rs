@@ -1,6 +1,6 @@
 use rusqlite::Connection;
 use std::fs::File;
-use std::io::{self, BufRead};
+use std::io::{self, BufRead, Write};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
@@ -10,22 +10,23 @@ use crate::repo;
 
 const GPIO_PATH_PREFIX: &str = "/sys/class/gpio";
 
-pub trait RelayStateReader: std::fmt::Debug + Send + Sync {
+pub trait RelayController: std::fmt::Debug + Send + Sync {
     fn read_state(&self) -> Result<bool, NeuroheatError>;
+    fn set_state(&self, state: bool) -> Result<(), NeuroheatError>;
 }
 
 #[derive(Debug)]
-pub struct GPIOReader {
+pub struct GPIOController {
     pin: u8,
 }
 
-impl GPIOReader {
+impl GPIOController {
     pub fn new(pin: u8) -> Self {
-        GPIOReader { pin }
+        GPIOController { pin }
     }
 }
 
-impl RelayStateReader for GPIOReader {
+impl RelayController for GPIOController {
     fn read_state(&self) -> Result<bool, NeuroheatError> {
         let path_str = format!("{}/gpio{}/value", GPIO_PATH_PREFIX, self.pin);
         let path = Path::new(&path_str);
@@ -44,6 +45,19 @@ impl RelayStateReader for GPIOReader {
                 Err(NeuroheatError::RelayError(err_msg))
             }
         }
+    }
+
+    fn set_state(&self, state: bool) -> Result<(), NeuroheatError> {
+        let path_str = format!("{}/gpio{}/value", GPIO_PATH_PREFIX, self.pin);
+        let path = Path::new(&path_str);
+
+        log::debug!("Setting GPIO pin {} to state {}", self.pin, state);
+
+        let mut file = File::create(&path)?;
+        let state_str = if state { "1" } else { "0" };
+        file.write_all(state_str.as_bytes())?;
+
+        Ok(())
     }
 }
 

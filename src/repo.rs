@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -90,6 +91,26 @@ pub fn get_current_state(
     })
 }
 
+pub fn store_temperature(
+    conn: &Arc<Mutex<Connection>>,
+    key: &str,
+    temperature: f32,
+    expected_temperature: Option<f32>,
+) -> Result<(), NeuroheatError> {
+    db::with_locked_connection(conn, |conn| {
+        conn.execute(
+            "INSERT INTO temperatures (key, temperature, expected_temperature) VALUES (?1, ?2, ?3)",
+            params![key, temperature, expected_temperature],
+        )
+        .map(|_| ())
+    })
+    .map_err(|e| {
+        let err_msg = format!("Failed to store temperature for key {}: {}", key, e);
+        log::error!("{}", err_msg);
+        NeuroheatError::DatabaseError(err_msg)
+    })
+}
+
 pub fn get_latest_temperature(
     conn: &Arc<Mutex<Connection>>,
     key: &str,
@@ -175,21 +196,42 @@ pub fn get_latest_temperatures(
     })
 }
 
-pub fn store_temperature(
+pub fn get_temperatures_since(
     conn: &Arc<Mutex<Connection>>,
     key: &str,
-    temperature: f32,
-    expected_temperature: Option<f32>,
-) -> Result<(), NeuroheatError> {
+    since: DateTime<Utc>,
+) -> Result<Vec<f32>, NeuroheatError> {
     db::with_locked_connection(conn, |conn| {
-        conn.execute(
-            "INSERT INTO temperatures (key, temperature, expected_temperature) VALUES (?1, ?2, ?3)",
-            params![key, temperature, expected_temperature],
-        )
-        .map(|_| ())
+        let mut stmt = conn.prepare(
+            "SELECT temperature, timestamp
+           FROM temperatures
+           WHERE key = ?1 AND timestamp >= ?2
+           ORDER BY timestamp DESC",
+        )?;
+
+        let timestamp = since.format("%Y-%m-%d %H:%M:%S").to_string();
+
+        let temperatures = stmt
+            .query_map(params![key, timestamp], |row| {
+                let temperature: f32 = row.get(0)?;
+                let timestamp: String = row.get(1)?;
+                log::debug!(
+                    "Collected temperature: {:.1}°C at {} for key {}",
+                    temperature,
+                    timestamp,
+                    key
+                );
+                Ok(temperature)
+            })?
+            .collect::<Result<Vec<f32>, _>>()?;
+
+        Ok(temperatures)
     })
     .map_err(|e| {
-        let err_msg = format!("Failed to store temperature for key {}: {}", key, e);
+        let err_msg = format!(
+            "Failed to get temperatures since {} for key {}: {}",
+            since, key, e
+        );
         log::error!("{}", err_msg);
         NeuroheatError::DatabaseError(err_msg)
     })
@@ -209,6 +251,45 @@ pub fn store_state(
     })
     .map_err(|e| {
         let err_msg = format!("Failed to store state for key {}: {}", key, e);
+        log::error!("{}", err_msg);
+        NeuroheatError::DatabaseError(err_msg)
+    })
+}
+
+pub fn get_valve_states_and_timestamps(
+    conn: &Arc<Mutex<Connection>>,
+) -> Result<HashMap<String, (bool, DateTime<Utc>)>, NeuroheatError> {
+    db::with_locked_connection(conn, |conn| {
+        let mut stmt = conn.prepare(
+            "SELECT key, state, MAX(timestamp) AS latest_timestamp
+             FROM states
+             GROUP BY key",
+        )?;
+
+        let mut rows = stmt.query([])?;
+        let mut result = HashMap::new();
+
+        while let Some(row) = rows.next()? {
+            let key: String = row.get(0)?;
+            let state: bool = row.get::<_, i32>(1)? != 0;
+            let timestamp: String = row.get(2)?;
+            let datetime = DateTime::parse_from_rfc3339(&timestamp)
+                .map_err(|e| {
+                    rusqlite::Error::FromSqlConversionFailure(
+                        0,
+                        rusqlite::types::Type::Text,
+                        Box::new(e),
+                    )
+                })?
+                .with_timezone(&Utc);
+
+            result.insert(key, (state, datetime));
+        }
+
+        Ok(result)
+    })
+    .map_err(|e| {
+        let err_msg = format!("Failed to get valve states and timestamps: {}", e);
         log::error!("{}", err_msg);
         NeuroheatError::DatabaseError(err_msg)
     })

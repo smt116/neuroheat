@@ -1,5 +1,5 @@
 use crate::error::NeuroheatError;
-use crate::relay::{GPIOReader, RelayStateReader};
+use crate::relay::{GPIOController, RelayController};
 use crate::temperature_sensor::{TemperatureSensor, DS18B20};
 
 use chrono::{Local, Timelike};
@@ -28,7 +28,7 @@ pub struct Room {
     pub temperature_schedule: Vec<TemperatureSchedule>,
     /// The relay reader for the valve.
     #[serde(skip)]
-    pub valve_reader: Option<Arc<dyn RelayStateReader>>,
+    pub valve_reader: Option<Arc<dyn RelayController>>,
 }
 
 /// Represents a temperature schedule for a room.
@@ -56,7 +56,7 @@ pub struct HeatingConfiguration {
     pub pipe_sensor: Option<Arc<dyn TemperatureSensor>>,
     /// The relay reader for the stove.
     #[serde(skip)]
-    pub stove_reader: Option<Arc<dyn RelayStateReader>>,
+    pub stove_reader: Option<Arc<dyn RelayController>>,
 }
 
 impl HeatingConfiguration {
@@ -76,10 +76,10 @@ impl HeatingConfiguration {
 
         for room in &mut config.rooms {
             room.sensor = Some(Arc::new(DS18B20::new(room.sensor_id.clone())));
-            room.valve_reader = Some(Arc::new(GPIOReader::new(room.valve_pin)));
+            room.valve_reader = Some(Arc::new(GPIOController::new(room.valve_pin)));
         }
         config.pipe_sensor = Some(Arc::new(DS18B20::new(config.pipe_sensor_id.clone())));
-        config.stove_reader = Some(Arc::new(GPIOReader::new(config.stove_pin)));
+        config.stove_reader = Some(Arc::new(GPIOController::new(config.stove_pin)));
 
         Ok(config)
     }
