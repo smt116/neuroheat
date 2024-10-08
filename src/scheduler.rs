@@ -79,7 +79,7 @@ async fn valve_controller_job(
     let conn_clone = Arc::clone(&conn);
 
     log::info!(
-        "Creating job for controlling heating: {}",
+        "Creating job for controlling valves: {}",
         VALVE_CONTROLLER_CRON
     );
 
