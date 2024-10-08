@@ -8,7 +8,7 @@ This is another version of the [Heating Brain](https://github.com/smt116/heating
 
 Install tools required by the `.tool-versions` file and ensure you have the following system packages installed on your macOS:
 
-```
+```sh
 brew install arm-unknown-linux-musleabihf
 rustup target add arm-unknown-linux-musleabihf
 ```
@@ -30,7 +30,7 @@ The host name depends on your server configuration. Also, keep
 in mind that the scheduler needs to populate some data before
 you will see any results (prior to that, it will return HTTP 404).
 
-```
+```sh
 neuroheat λ curl neuroheat.local:3030/api/temperatures/office | jq
 {
   "timestamp": "2024-10-06 10:32:03",
@@ -41,7 +41,7 @@ neuroheat λ curl neuroheat.local:3030/api/temperatures/office | jq
 }
 ```
 
-```
+```sh
 neuroheat λ curl neuroheat.local:3030/api/state | jq
 {
   "living_room": {
@@ -96,13 +96,13 @@ neuroheat λ curl neuroheat.local:3030/api/state | jq
 
 Install `sudo apt install -y sqlite` and run:
 
-```
+```sh
 sqlite3 /srv/neuroheat/neuroheat.db
 ```
 
 ### Accessing logs
 
-```
+```sh
 journalctl --unit neuroheat.service --lines=50 --follow
 ```
 
@@ -112,19 +112,19 @@ This is a hobby project, so it does not implement any migration mechanism (yet?)
 
 1. Stop the service on the server:
 
-    ```
+    ```sh
     sudo systemctl stop neuroheat.service
     ```
 
 1. Remove the database on the server:
 
-    ```
+    ```sh
     sudo rm /srv/neuroheat/neuroheat.db
     ```
 
 1. Let the application initialize it from scratch on startup:
 
-    ```
+    ```sh
     ./bin/deploy
     ```
 
@@ -152,7 +152,7 @@ This is a hobby project, so it does not implement any migration mechanism (yet?)
 
 1. [Allow password-less SSH connections](https://www.raspberrypi.org/documentation/remote-access/ssh/passwordless.md):
 
-    ```
+    ```sh
     ssh-copy-id pi@[ip]
     ```
 
@@ -160,14 +160,14 @@ This is a hobby project, so it does not implement any migration mechanism (yet?)
 
 1. [Set the hostname](https://thepihut.com/blogs/raspberry-pi-tutorials/19668676-renaming-your-raspberry-pi-the-hostname):
 
-    ```
+    ```sh
     sudo sed -i 's/raspberrypi/[neuroheat or any other hostname]/g' /etc/hostname
     sudo sed -i 's/raspberrypi/[neuroheat or any other hostname]/g' /etc/hosts
     ```
 
 1. [Fix the `cannot change locale (en_US.UTF-8)` issue](https://www.jaredwolff.com/raspberry-pi-setting-your-locale/):
 
-    ```
+    ```sh
     sudo sed -i 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/g' /etc/locale.gen
     sudo locale-gen en_US.UTF-8
     sudo update-locale en_US.UTF-8
@@ -175,13 +175,13 @@ This is a hobby project, so it does not implement any migration mechanism (yet?)
 
 1. Set the new password:
 
-    ```
+    ```sh
     sudo passwd pi
     ```
 
 1. Upgrade the distro:
 
-    ```
+    ```sh
     sudo apt-get update
     sudo apt-get dist-upgrade
     sudo apt-get autoclean
@@ -189,7 +189,7 @@ This is a hobby project, so it does not implement any migration mechanism (yet?)
 
 1. Set the local timezone:
 
-    ```
+    ```sh
     sudo timedatectl set-timezone Europe/Warsaw
     ```
 
@@ -234,7 +234,7 @@ This is a hobby project, so it does not implement any migration mechanism (yet?)
 
 1. Create application directories:
 
-    ```
+    ```sh
     mkdir -p /srv/backups /srv/neuroheat /opt/neuroheat/bin
     chown -R pi:pi /opt/neuroheat/ /srv/backups/
     ```
@@ -252,6 +252,6 @@ This is a hobby project, so it does not implement any migration mechanism (yet?)
 
 1. Deploy the code:
 
-    ```
+    ```sh
     ./bin/deploy
     ```
