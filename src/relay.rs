@@ -13,6 +13,7 @@ const GPIO_PATH_PREFIX: &str = "/sys/class/gpio";
 pub trait RelayController: std::fmt::Debug + Send + Sync {
     fn read_state(&self) -> Result<bool, NeuroheatError>;
     fn set_state(&self, state: bool) -> Result<(), NeuroheatError>;
+    fn setup(&self) -> Result<(), NeuroheatError>;
 }
 
 #[derive(Debug)]
@@ -59,6 +60,46 @@ impl RelayController for GPIOController {
 
         Ok(())
     }
+
+    fn setup(&self) -> Result<(), NeuroheatError> {
+        let export_path = format!("{}/export", GPIO_PATH_PREFIX);
+        let direction_path = format!("{}/gpio{}/direction", GPIO_PATH_PREFIX, self.pin);
+        let gpio_path = format!("{}/gpio{}", GPIO_PATH_PREFIX, self.pin);
+
+        if Path::new(&gpio_path).exists() {
+            log::debug!("Pin {} is already exported", self.pin);
+        } else {
+            log::info!("Exporting pin {}", self.pin);
+            let mut file = File::create(&export_path)?;
+            file.write_all(self.pin.to_string().as_bytes())?;
+        }
+
+        let direction = "out";
+        let current_direction = std::fs::read_to_string(&direction_path).unwrap_or_default();
+        if current_direction.trim() == direction {
+            log::debug!("Pin {} is already set as {}", self.pin, direction);
+        } else {
+            log::info!("Setting up pin {} as {}", self.pin, direction);
+            let mut file = File::create(&direction_path)?;
+            file.write_all(direction.as_bytes())?;
+        }
+
+        Ok(())
+    }
+}
+
+pub fn setup_all_relays(config: &HeatingConfiguration) -> Result<(), NeuroheatError> {
+    if let Some(stove_reader) = &config.stove_reader {
+        stove_reader.setup()?;
+    }
+
+    for room in &config.rooms {
+        if let Some(valve_reader) = &room.valve_reader {
+            valve_reader.setup()?;
+        }
+    }
+
+    Ok(())
 }
 
 pub async fn read_relay_states(

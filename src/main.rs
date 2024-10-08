@@ -30,6 +30,9 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     // initialize database if necessary
     db::init(&shared_conn, &config)?;
 
+    // setup GPIO pins
+    relay::setup_all_relays(&config)?;
+
     // start scheduler (e.g., reading data from sensors)
     scheduler::start_scheduler(Arc::clone(&config), Arc::clone(&shared_conn)).await?;
 
