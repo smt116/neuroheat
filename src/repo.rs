@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use rusqlite::{params, Connection};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -38,7 +38,10 @@ pub fn get_current_state(
             .query_map([], |row| {
                 let key = row.get::<_, String>(0)?;
                 let label = row.get::<_, String>(1)?;
-                let timestamp = row.get::<_, String>(2)?;
+                let timestamp_str = row.get::<_, String>(2)?;
+                let timestamp = NaiveDateTime::parse_from_str(&timestamp_str, "%Y-%m-%d %H:%M:%S")
+                    .map(|dt| dt.and_utc().to_string())
+                    .unwrap_or_else(|_| timestamp_str);
                 let temperature = row.get::<_, f32>(3)?.to_string();
                 let mut map = HashMap::from([
                     ("label", label),
@@ -69,7 +72,10 @@ pub fn get_current_state(
             |row| {
                 let key = row.get::<_, String>(0)?;
                 let label = row.get::<_, String>(1)?;
-                let timestamp = row.get::<_, String>(2)?;
+                let timestamp_str = row.get::<_, String>(2)?;
+                let timestamp = NaiveDateTime::parse_from_str(&timestamp_str, "%Y-%m-%d %H:%M:%S")
+                    .map(|dt| dt.and_utc().to_string())
+                    .unwrap_or_else(|_| timestamp_str);
                 let state = (row.get::<_, i32>(3)? != 0).to_string();
                 let map = HashMap::from([
                     ("label", label),
@@ -132,7 +138,15 @@ pub fn get_latest_temperature(
                 let mut result = HashMap::from([
                     ("key", row.get::<_, String>(0)?),
                     ("label", row.get::<_, String>(1)?),
-                    ("timestamp", row.get::<_, String>(2)?),
+                    (
+                        "timestamp",
+                        NaiveDateTime::parse_from_str(
+                            &row.get::<_, String>(2)?,
+                            "%Y-%m-%d %H:%M:%S",
+                        )
+                        .map(|dt| dt.and_utc().to_string())
+                        .unwrap(),
+                    ),
                     ("temperature", row.get::<_, f32>(3)?.to_string()),
                 ]);
                 if let Some(expected_temp) = row.get::<_, Option<f32>>(4)? {
@@ -173,7 +187,10 @@ pub fn get_latest_temperatures(
             .query_map([], |row| {
                 let key = row.get::<_, String>(0)?;
                 let label = row.get::<_, String>(1)?;
-                let timestamp = row.get::<_, String>(2)?;
+                let timestamp =
+                    NaiveDateTime::parse_from_str(&row.get::<_, String>(2)?, "%Y-%m-%d %H:%M:%S")
+                        .map(|dt| dt.and_utc().to_string())
+                        .unwrap();
                 let temperature = row.get::<_, f32>(3)?.to_string();
                 let mut map = HashMap::from([
                     ("label", label),
@@ -214,7 +231,10 @@ pub fn get_temperatures_since(
         let temperatures = stmt
             .query_map(params![key, timestamp], |row| {
                 let temperature: f32 = row.get(0)?;
-                let timestamp: String = row.get(1)?;
+                let timestamp =
+                    NaiveDateTime::parse_from_str(&row.get::<_, String>(1)?, "%Y-%m-%d %H:%M:%S")
+                        .map(|dt| dt.and_utc().to_string())
+                        .unwrap();
                 log::debug!(
                     "Collected temperature: {:.1}°C at {} for key {}",
                     temperature,
@@ -274,8 +294,8 @@ pub fn get_valve_states_and_timestamps(
             let state: i32 = row.get(1)?;
             let timestamp: String = row.get(2)?;
 
-            let datetime = match DateTime::parse_from_str(&timestamp, "%Y-%m-%d %H:%M:%S") {
-                Ok(dt) => dt.with_timezone(&Utc),
+            let datetime = match NaiveDateTime::parse_from_str(&timestamp, "%Y-%m-%d %H:%M:%S") {
+                Ok(dt) => dt.and_utc(),
                 Err(e) => {
                     log::error!(
                         "Failed to parse timestamp for key {}: {}: {}",
