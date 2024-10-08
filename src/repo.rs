@@ -271,19 +271,23 @@ pub fn get_valve_states_and_timestamps(
 
         while let Some(row) = rows.next()? {
             let key: String = row.get(0)?;
-            let state: bool = row.get::<_, i32>(1)? != 0;
+            let state: i32 = row.get(1)?;
             let timestamp: String = row.get(2)?;
-            let datetime = DateTime::parse_from_rfc3339(&timestamp)
-                .map_err(|e| {
-                    rusqlite::Error::FromSqlConversionFailure(
-                        0,
-                        rusqlite::types::Type::Text,
-                        Box::new(e),
-                    )
-                })?
-                .with_timezone(&Utc);
 
-            result.insert(key, (state, datetime));
+            let datetime = match DateTime::parse_from_str(&timestamp, "%Y-%m-%d %H:%M:%S") {
+                Ok(dt) => dt.with_timezone(&Utc),
+                Err(e) => {
+                    log::error!(
+                        "Failed to parse timestamp for key {}: {}: {}",
+                        key,
+                        timestamp,
+                        e
+                    );
+                    continue;
+                }
+            };
+
+            result.insert(key, (state != 0, datetime));
         }
 
         Ok(result)
