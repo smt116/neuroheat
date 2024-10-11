@@ -1,6 +1,6 @@
 use chrono::{DateTime, NaiveDateTime, Utc};
 use rusqlite::{params, Connection};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, Mutex};
 
 use crate::db;
@@ -8,7 +8,7 @@ use crate::error::NeuroheatError;
 
 pub fn get_current_state(
     conn: &Arc<Mutex<Connection>>,
-) -> Result<HashMap<String, HashMap<&'static str, String>>, NeuroheatError> {
+) -> Result<BTreeMap<String, HashMap<&'static str, String>>, NeuroheatError> {
     db::with_locked_connection(conn, |conn| {
         let mut stmt = conn.prepare(
             r#"
@@ -58,7 +58,7 @@ pub fn get_current_state(
                 }
                 Ok((key, map))
             })?
-            .collect::<Result<HashMap<_, _>, _>>()?;
+            .collect::<Result<BTreeMap<_, _>, _>>()?;
 
         let stove_state = conn.query_row(
             r#"
