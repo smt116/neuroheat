@@ -11,27 +11,29 @@ pub fn get_current_state(
 ) -> Result<HashMap<String, HashMap<&'static str, String>>, NeuroheatError> {
     db::with_locked_connection(conn, |conn| {
         let mut stmt = conn.prepare(
-            "SELECT
-                 temperatures.key,
-                 COALESCE(labels.label, temperatures.key),
-                 temperatures.timestamp,
-                 temperatures.temperature,
-                 temperatures.expected_temperature,
-                 states.state
-               FROM labels
-               LEFT JOIN temperatures ON labels.key = temperatures.key
-               AND temperatures.timestamp = (
-                   SELECT MAX(timestamp)
-                   FROM temperatures
-                   WHERE key = labels.key
-               )
-               LEFT JOIN states ON labels.key = states.key
-               AND states.timestamp = (
-                   SELECT MAX(timestamp)
-                   FROM states
-                   WHERE key = labels.key
-               )
-               WHERE temperatures.key IS NOT NULL",
+            r#"
+            SELECT
+              temperatures.key,
+              COALESCE(labels.label, temperatures.key),
+              temperatures.timestamp,
+              temperatures.temperature,
+              temperatures.expected_temperature,
+              states.state
+            FROM labels
+            LEFT JOIN temperatures ON labels.key = temperatures.key
+            AND temperatures.timestamp = (
+              SELECT MAX(timestamp)
+              FROM temperatures
+              WHERE key = labels.key
+            )
+            LEFT JOIN states ON labels.key = states.key
+            AND states.timestamp = (
+              SELECT MAX(timestamp)
+              FROM states
+              WHERE key = states.key
+            )
+            WHERE temperatures.key IS NOT NULL
+            "#,
         )?;
 
         let mut result = stmt
@@ -59,15 +61,18 @@ pub fn get_current_state(
             .collect::<Result<HashMap<_, _>, _>>()?;
 
         let stove_state = conn.query_row(
-            "SELECT
-               states.key,
-               COALESCE(labels.label, states.key),
-               states.timestamp,
-               states.state
-             FROM states
-             LEFT JOIN labels ON labels.key = states.key
-             WHERE states.key = 'stove'
-             ORDER BY states.timestamp DESC LIMIT 1",
+            r#"
+            SELECT
+              states.key,
+              COALESCE(labels.label, states.key),
+              states.timestamp,
+              states.state
+            FROM states
+            LEFT JOIN labels ON labels.key = states.key
+            WHERE states.key = 'stove'
+            ORDER BY states.timestamp DESC
+            LIMIT 1
+            "#,
             [],
             |row| {
                 let key = row.get::<_, String>(0)?;
@@ -105,7 +110,10 @@ pub fn store_temperature(
 ) -> Result<(), NeuroheatError> {
     db::with_locked_connection(conn, |conn| {
         conn.execute(
-            "INSERT INTO temperatures (key, temperature, expected_temperature) VALUES (?1, ?2, ?3)",
+            r#"
+            INSERT INTO temperatures (key, temperature, expected_temperature)
+            VALUES (?1, ?2, ?3)
+            "#,
             params![key, temperature, expected_temperature],
         )
         .map(|_| ())
@@ -123,16 +131,18 @@ pub fn get_latest_temperature(
 ) -> Result<HashMap<&'static str, String>, NeuroheatError> {
     db::with_locked_connection(conn, |conn| {
         conn.query_row(
-            "SELECT
-               temperatures.key,
-               COALESCE(labels.label, temperatures.key),
-               temperatures.timestamp,
-               temperatures.temperature,
-               temperatures.expected_temperature
+            r#"
+            SELECT
+              temperatures.key,
+              COALESCE(labels.label, temperatures.key),
+              temperatures.timestamp,
+              temperatures.temperature,
+              temperatures.expected_temperature
              FROM temperatures
              LEFT JOIN labels ON labels.key = temperatures.key
              WHERE temperatures.key = ?
-             ORDER BY temperatures.timestamp DESC LIMIT 1",
+             ORDER BY temperatures.timestamp DESC LIMIT 1
+             "#,
             params![key],
             |row| {
                 let mut result = HashMap::from([
@@ -170,10 +180,12 @@ pub fn get_temperatures_since(
 ) -> Result<Vec<f32>, NeuroheatError> {
     db::with_locked_connection(conn, |conn| {
         let mut stmt = conn.prepare(
-            "SELECT temperature, timestamp
-           FROM temperatures
-           WHERE key = ?1 AND timestamp >= ?2
-           ORDER BY timestamp DESC",
+            r#"
+            SELECT temperature, timestamp
+            FROM temperatures
+            WHERE key = ?1 AND timestamp >= ?2
+            ORDER BY timestamp DESC
+            "#,
         )?;
 
         let timestamp = since.format("%Y-%m-%d %H:%M:%S").to_string();
@@ -231,9 +243,11 @@ pub fn get_valve_states_and_timestamps(
 ) -> Result<HashMap<String, (bool, DateTime<Utc>)>, NeuroheatError> {
     db::with_locked_connection(conn, |conn| {
         let mut stmt = conn.prepare(
-            "SELECT key, state, MAX(timestamp) AS latest_timestamp
-             FROM states
-             GROUP BY key",
+            r#"
+            SELECT key, state, MAX(timestamp) AS latest_timestamp
+            FROM states
+            GROUP BY key
+            "#,
         )?;
 
         let mut rows = stmt.query([])?;
